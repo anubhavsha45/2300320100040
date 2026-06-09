@@ -1,17 +1,20 @@
-# Stage 1 - Notification System API Design
+# Stage 1
 
 ## Overview
 
-The Campus Notification Platform enables students to receive real-time notifications related to placements, events, examinations, and results. The system supports creating, viewing, updating, and deleting notifications while ensuring real-time delivery.
+The notification platform allows users to receive and manage notifications when they are logged into the application. The system supports creation, retrieval, updating, deletion and real-time delivery of notifications.
 
-## Core Actions
+### Core Actions
 
 1. Create Notification
-2. Get All Notifications
-3. Get Notification By ID
-4. Mark Notification As Read
-5. Delete Notification
-6. Receive Real-Time Notifications
+2. Get User Notifications
+3. Get Unread Notifications
+4. Mark Notification as Read
+5. Mark All Notifications as Read
+6. Delete Notification
+7. Real-Time Notification Delivery
+
+---
 
 ## Authentication
 
@@ -26,22 +29,22 @@ Content-Type: application/json
 
 ---
 
-## Create Notification
+## 1. Create Notification
 
 ### Endpoint
 
 ```http
-POST /api/notifications
+POST /api/v1/notifications
 ```
 
 ### Request Body
 
 ```json
 {
+  "userId": "12345",
   "title": "Placement Drive",
-  "message": "Google Internship applications are now open.",
-  "type": "placement",
-  "targetAudience": "all"
+  "message": "Company XYZ has opened registrations.",
+  "type": "placement"
 }
 ```
 
@@ -50,66 +53,70 @@ POST /api/notifications
 ```json
 {
   "success": true,
-  "notificationId": "12345",
-  "message": "Notification created successfully"
+  "notificationId": "n101"
 }
 ```
 
 ---
 
-## Get All Notifications
+## 2. Get Notifications
 
 ### Endpoint
 
 ```http
-GET /api/notifications
+GET /api/v1/notifications
 ```
 
-### Response
-
-```json
-[
-  {
-    "id": "12345",
-    "title": "Placement Drive",
-    "message": "Google Internship applications are now open.",
-    "type": "placement",
-    "isRead": false,
-    "createdAt": "2026-06-09T10:00:00Z"
-  }
-]
-```
-
----
-
-## Get Notification By ID
-
-### Endpoint
+### Query Parameters
 
 ```http
-GET /api/notifications/:id
+?page=1&limit=20
 ```
 
 ### Response
 
 ```json
 {
-  "id": "12345",
-  "title": "Placement Drive",
-  "message": "Google Internship applications are now open.",
-  "type": "placement",
-  "isRead": false
+  "notifications": [
+    {
+      "id": "n101",
+      "title": "Placement Drive",
+      "message": "Company XYZ has opened registrations.",
+      "type": "placement",
+      "isRead": false,
+      "createdAt": "2026-06-09T10:00:00Z"
+    }
+  ]
 }
 ```
 
 ---
 
-## Mark Notification As Read
+## 3. Get Unread Notifications
 
 ### Endpoint
 
 ```http
-PATCH /api/notifications/:id/read
+GET /api/v1/notifications/unread
+```
+
+### Response
+
+```json
+{
+  "count": 5,
+  "notifications": []
+}
+```
+
+---
+
+## 4. Mark Notification as Read
+
+### Endpoint
+
+```http
+PATCH /api/v1/notifications/:notificationId/read
 ```
 
 ### Response
@@ -123,12 +130,31 @@ PATCH /api/notifications/:id/read
 
 ---
 
-## Delete Notification
+## 5. Mark All Notifications as Read
 
 ### Endpoint
 
 ```http
-DELETE /api/notifications/:id
+PATCH /api/v1/notifications/read-all
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "All notifications marked as read"
+}
+```
+
+---
+
+## 6. Delete Notification
+
+### Endpoint
+
+```http
+DELETE /api/v1/notifications/:notificationId
 ```
 
 ### Response
@@ -142,85 +168,21 @@ DELETE /api/notifications/:id
 
 ---
 
-## Real-Time Notification Design
+## Real-Time Notification Mechanism
 
-The system uses WebSockets (Socket.IO) for real-time communication.
+The system uses WebSocket technology for real-time notification delivery.
 
 ### Flow
 
-1. User logs in.
-2. Client establishes Socket.IO connection.
-3. Server emits notification events.
-4. Connected clients instantly receive notifications without page refresh.
+1. User logs into the application.
+2. Client establishes WebSocket connection.
+3. Server pushes new notifications instantly.
+4. Notification appears without page refresh.
+5. Unread notification count is updated automatically.
 
-### Event Example
+### Benefits
 
-```javascript
-socket.emit("notification", {
-  title: "Placement Drive",
-  message: "Google Internship applications are now open.",
-});
-```
-
-# Stage 2 - Database Design
-
-## Database Choice
-
-MongoDB is selected because notifications are document-oriented, flexible, and easy to scale horizontally.
-
-## Collections
-
-### Users
-
-```json
-{
-  "_id": "user123",
-  "name": "Anubhav",
-  "email": "user@example.com"
-}
-```
-
-### Notifications
-
-```json
-{
-  "_id": "notif123",
-  "title": "Placement Drive",
-  "message": "Google Internship applications are now open.",
-  "type": "placement",
-  "createdAt": "2026-06-09T10:00:00Z"
-}
-```
-
-### NotificationReads
-
-```json
-{
-  "userId": "user123",
-  "notificationId": "notif123",
-  "readAt": "2026-06-09T10:05:00Z"
-}
-```
-
-## Scaling Challenges
-
-1. Large number of notifications.
-2. Slow query performance.
-3. High concurrent users.
-4. Growing storage requirements.
-
-## Solutions
-
-1. Indexing on userId and createdAt.
-2. Pagination for notification retrieval.
-3. Redis caching for frequently accessed data.
-4. MongoDB sharding for horizontal scaling.
-5. Archive old notifications periodically.
-
-## Sample Query
-
-Get latest notifications:
-
-```javascript
-db.notifications.find().sort({ createdAt: -1 }).limit(20);
-```
+- Low latency delivery
+- Reduced database polling
+- Better user experience
+- Scalable notification delivery
