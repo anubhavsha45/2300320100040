@@ -578,3 +578,36 @@ worker():
 - Faster processing
 - Supports retries
 - Suitable for large scale notification delivery
+
+# Stage 6
+
+## Priority Calculation
+
+Priority is determined using two factors:
+
+1. Notification Type
+2. Recency
+
+Weights used:
+
+| Type      | Weight |
+| --------- | ------ |
+| Placement | 3      |
+| Result    | 2      |
+| Event     | 1      |
+
+More recent notifications receive a higher score than older notifications of the same type.
+
+The application fetches notifications from the provided Notification API, calculates a priority score, sorts notifications in descending order and displays the top 10 notifications.
+
+## Efficient Maintenance Of Top 10
+
+Instead of sorting the entire collection whenever a new notification arrives, a Min Heap of size 10 can be maintained.
+
+Advantages:
+
+- O(log 10) insertion
+- Constant memory usage
+- Efficient handling of continuous notification streams
+
+This approach ensures that only the highest priority notifications remain in memory.
