@@ -394,3 +394,187 @@ FROM notifications
 WHERE notificationType = 'Placement'
 AND createdAt >= NOW() - INTERVAL '7 days';
 ```
+
+# Stage 4
+
+## Problem
+
+Notifications are fetched every time a student loads the page. As the number of users increases, the database receives a huge number of repeated read requests which affects performance and user experience.
+
+---
+
+## Solution 1: Redis Caching
+
+Store frequently accessed notification data and unread counts in Redis.
+
+### Benefits
+
+- Faster response times
+- Reduced database load
+- Better scalability
+
+### Tradeoff
+
+- Additional infrastructure required
+- Cache invalidation must be handled correctly
+
+---
+
+## Solution 2: Pagination
+
+Instead of fetching all notifications:
+
+```http
+GET /notifications?page=1&limit=20
+```
+
+### Benefits
+
+- Smaller query results
+- Reduced network traffic
+- Faster page loads
+
+### Tradeoff
+
+- Users must load additional pages to view older notifications
+
+---
+
+## Solution 3: WebSocket Based Updates
+
+Rather than querying the database repeatedly, the server pushes new notifications in real time.
+
+### Benefits
+
+- Near real-time updates
+- Fewer database requests
+
+### Tradeoff
+
+- More complex implementation
+- Requires persistent connections
+
+---
+
+## Solution 4: Read Replicas
+
+Use database replicas for read operations while keeping writes on the primary database.
+
+### Benefits
+
+- Better read throughput
+- Reduced load on primary database
+
+### Tradeoff
+
+- Replication lag may occur
+
+---
+
+## Recommended Approach
+
+Use a combination of:
+
+- Redis Cache
+- Pagination
+- WebSockets
+- Read Replicas
+
+This provides the best balance between performance, scalability and user experience.
+
+# Stage 5
+
+## Problems In The Current Implementation
+
+```python
+for student_id in student_ids:
+    send_email(student_id, message)
+    save_to_db(student_id, message)
+    push_to_app(student_id, message)
+```
+
+### Issues
+
+1. Processing is sequential and slow.
+2. A failure in email delivery can interrupt the process.
+3. No retry mechanism exists.
+4. Difficult to handle 50,000 students simultaneously.
+5. Partial failures can create inconsistent states.
+
+---
+
+## Recommended Design
+
+Use asynchronous processing with a message queue.
+
+```text
+HR Request
+    |
+    v
+Notification Service
+    |
+    v
+Message Queue (RabbitMQ / Kafka)
+    |
+    +-------------------+
+    |                   |
+    v                   v
+Email Worker      Push Notification Worker
+```
+
+---
+
+## Should Database Save And Email Happen Together?
+
+No.
+
+The notification should first be saved in the database.
+
+After successful storage, background workers should process email and push notification delivery.
+
+This ensures that notifications are not lost even if email delivery fails.
+
+---
+
+## Handling Failures
+
+If email delivery fails:
+
+- Retry automatically
+- Log the failure
+- Move failed messages to a Dead Letter Queue after multiple retries
+
+---
+
+## Revised Pseudocode
+
+```python
+function notify_all(student_ids, message):
+
+    for student_id in student_ids:
+        save_notification_to_db(student_id, message)
+
+        publish_to_queue({
+            student_id: student_id,
+            message: message
+        })
+
+
+worker():
+
+    while queue_not_empty:
+
+        job = get_next_job()
+
+        send_email(job.student_id, job.message)
+
+        push_notification(job.student_id, job.message)
+```
+
+### Benefits
+
+- Scalable
+- Fault tolerant
+- Faster processing
+- Supports retries
+- Suitable for large scale notification delivery
